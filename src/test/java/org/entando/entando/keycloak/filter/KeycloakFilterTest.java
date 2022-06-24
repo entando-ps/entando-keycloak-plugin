@@ -41,6 +41,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.apache.commons.lang3.StringUtils;
+import org.entando.entando.aps.system.services.tenant.ITenantManager;
 import org.entando.entando.ent.exception.EntException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +59,7 @@ class KeycloakFilterTest {
     @Mock private IAuthenticationProviderManager providerManager;
     @Mock private KeycloakAuthorizationManager keycloakGroupManager;
     @Mock private IUserManager userManager;
+    @Mock private ITenantManager tenantManager;
 
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
@@ -77,14 +80,17 @@ class KeycloakFilterTest {
     @BeforeEach
     public void setUp() {
 
-        when(configuration.getAuthUrl()).thenReturn("https://dev.entando.org/auth");
-        when(configuration.getRealm()).thenReturn("entando");
+        Mockito.lenient().when(configuration.getAuthUrl()).thenReturn("https://dev.entando.org/auth");
+        Mockito.lenient().when(configuration.getRealm()).thenReturn("entando");
         Mockito.lenient().when(configuration.getClientId()).thenReturn("entando-app");
-        when(configuration.getPublicClientId()).thenReturn("entando-web");
+        Mockito.lenient().when(configuration.getPublicClientId()).thenReturn("entando-web");
         Mockito.lenient().when(configuration.getClientSecret()).thenReturn("a76d5398-fc2f-4859-bf57-f043a89eea70");
 
-        keycloakFilter = new KeycloakFilter(configuration, oidcService, providerManager, keycloakGroupManager, userManager);
+        keycloakFilter = new KeycloakFilter(configuration, oidcService, providerManager, keycloakGroupManager, userManager, tenantManager);
         Mockito.lenient().when(request.getSession()).thenReturn(session);
+        Mockito.lenient().when(request.getServerName()).thenReturn("dev.entando.org");
+        Mockito.lenient().when(request.getHeader("X-Forwarded-Proto")).thenReturn("https");
+        Mockito.lenient().when(request.getHeader("Host")).thenReturn("dev.entando.org");
     }
 
     @Test
@@ -128,7 +134,7 @@ class KeycloakFilterTest {
         when(request.getParameter(eq("code"))).thenReturn(authorizationCode);
         when(request.getParameter(eq("state"))).thenReturn(state);
         when(request.getRequestURL()).thenReturn(new StringBuffer(loginEndpoint));
-        when(request.getContextPath()).thenReturn("https://dev.entando.org/entando-app");
+        when(request.getContextPath()).thenReturn("/entando-app");
 
         when(oidcService.requestToken(anyString(), anyString())).thenReturn(authResponse);
         when(authResponse.getStatusCode()).thenReturn(HttpStatus.OK);
@@ -174,7 +180,7 @@ class KeycloakFilterTest {
         when(request.getParameter(eq("code"))).thenReturn(authorizationCode);
         when(request.getParameter(eq("state"))).thenReturn(state);
         when(request.getRequestURL()).thenReturn(new StringBuffer(loginEndpoint));
-        Mockito.lenient().when(request.getContextPath()).thenReturn("https://dev.entando.org/entando-app");
+        Mockito.lenient().when(request.getContextPath()).thenReturn("/entando-app");
 
         Mockito.lenient().when(oidcService.requestToken(anyString(), anyString())).thenReturn(authResponse);
         Mockito.lenient().when(authResponse.getStatusCode()).thenReturn(HttpStatus.OK);
@@ -201,7 +207,7 @@ class KeycloakFilterTest {
         when(request.getParameter(eq("code"))).thenReturn(authorizationCode);
         when(request.getParameter(eq("state"))).thenReturn(state);
         when(request.getRequestURL()).thenReturn(new StringBuffer(loginEndpoint));
-        when(request.getContextPath()).thenReturn("https://dev.entando.org/entando-app");
+        when(request.getContextPath()).thenReturn("/entando-app");
 
         final HttpClientErrorException exception = Mockito.mock(HttpClientErrorException.class);
         when(exception.getResponseBodyAsString()).thenReturn("{ \"error\": \"invalid_grant\", \"error_description\": \"Refresh token expired\" }");
