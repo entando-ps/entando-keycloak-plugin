@@ -6,18 +6,18 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="it">
 <head>
 	<title>Entando - Login</title>
-	<link rel="stylesheet" type="text/css" href="<wp:resourceURL />administration/common/css/administration.css" media="screen" />
-	<link rel="stylesheet" type="text/css" href="<wp:resourceURL />administration/common/css/layout-general.css" media="screen" />
+	<link rel="stylesheet" type="text/css" href="<wp:resourceURL ignoreTenant="true" />administration/common/css/administration.css" media="screen" />
+	<link rel="stylesheet" type="text/css" href="<wp:resourceURL ignoreTenant="true" />administration/common/css/layout-general.css" media="screen" />
 	<!--[if IE 7]>
-		<link rel="stylesheet" type="text/css" href="<wp:resourceURL />administration/common/css/layout-general-ie7.css" media="screen" />
+		<link rel="stylesheet" type="text/css" href="<wp:resourceURL ignoreTenant="true" />administration/common/css/layout-general-ie7.css" media="screen" />
 	<![endif]-->
 	
-	<link rel="stylesheet" type="text/css" href="<wp:resourceURL />administration/basic/css/administration.css" media="screen" />
-	<link rel="stylesheet" type="text/css" href="<wp:resourceURL />administration/basic/css/layout-general.css" media="screen" />
+	<link rel="stylesheet" type="text/css" href="<wp:resourceURL ignoreTenant="true" />administration/basic/css/administration.css" media="screen" />
+	<link rel="stylesheet" type="text/css" href="<wp:resourceURL ignoreTenant="true" />administration/basic/css/layout-general.css" media="screen" />
 
-	<script type="text/javascript" src="<wp:resourceURL />administration/common/js/mootools-core-1.3-full-compat-yc.js"></script>
-	<script type="text/javascript" src="<wp:resourceURL />administration/common/js/mootools-more-1.3-full-compat-yc.js"></script>
-	<script type="text/javascript" src="<wp:resourceURL />administration/common/js/login.js" ></script>	
+	<script type="text/javascript" src="<wp:resourceURL ignoreTenant="true" />administration/common/js/mootools-core-1.3-full-compat-yc.js"></script>
+	<script type="text/javascript" src="<wp:resourceURL ignoreTenant="true" />administration/common/js/mootools-more-1.3-full-compat-yc.js"></script>
+	<script type="text/javascript" src="<wp:resourceURL ignoreTenant="true" />administration/common/js/login.js" ></script>	
 
 	<jsp:include page="/WEB-INF/aps/jsp/models/inc/lesscss-active/lesscss.jsp" />
 	
