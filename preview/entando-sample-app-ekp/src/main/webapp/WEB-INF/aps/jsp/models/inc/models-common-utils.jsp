@@ -34,7 +34,7 @@
 
 		<%-- js scripts (remember to include the libraries first) --%>
 		<wp:outputHeadInfo type="JS">
-			<script src="<wp:resourceURL />static/js/<wp:printHeadInfo />"></script>
+			<script src="<wp:resourceURL ignoreTenant="true" />static/js/<wp:printHeadInfo />"></script>
 		</wp:outputHeadInfo>
 
 		<%-- external/CDN js scripts (remember to include the libraries first) --%>
