@@ -1,6 +1,5 @@
 package org.entando.entando.aps.servlet.security;
 
-import static java.util.Optional.ofNullable;
 import static org.entando.entando.aps.servlet.security.KeycloakSecurityConfig.API_PATH;
 
 import com.agiletec.aps.system.SystemConstants;
@@ -12,13 +11,6 @@ import com.agiletec.aps.system.services.user.IAuthenticationProviderManager;
 import com.agiletec.aps.system.services.user.IUserManager;
 import com.agiletec.aps.system.services.user.UserDetails;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
-import java.util.List;
-import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import org.entando.entando.ent.exception.EntException;
 import org.entando.entando.keycloak.services.KeycloakAuthorizationManager;
 import org.entando.entando.keycloak.services.KeycloakConfiguration;
 import org.entando.entando.keycloak.services.oidc.OpenIDConnectService;
@@ -41,6 +33,19 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.security.web.authentication.www.NonceExpiredException;
 import org.springframework.stereotype.Service;
 
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+
+import static java.util.Optional.ofNullable;
+
+import com.agiletec.aps.system.EntThreadLocal;
+import org.entando.entando.aps.system.services.tenant.ITenantManager;
+import org.entando.entando.ent.exception.EntException;
+
 @Service
 public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessingFilter implements AuthenticationFailureHandler {
 
@@ -52,13 +57,15 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
     private final OpenIDConnectService oidcService;
     private final IAuthenticationProviderManager authenticationProviderManager;
     private final KeycloakAuthorizationManager keycloakGroupManager;
+    private final ITenantManager tenantManager;
 
     @Autowired
     public KeycloakAuthenticationFilter(final KeycloakConfiguration configuration,
                                         final IUserManager userManager,
                                         final OpenIDConnectService oidcService,
                                         final IAuthenticationProviderManager authenticationProviderManager,
-                                        final KeycloakAuthorizationManager keycloakGroupManager) {
+                                        final KeycloakAuthorizationManager keycloakGroupManager,
+                                        final ITenantManager tenantManager) {
         super("/api/**");
         this.objectMapper = new ObjectMapper();
         this.configuration = configuration;
@@ -67,10 +74,17 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
         this.userManager = userManager;
         this.oidcService = oidcService;
         this.authenticationProviderManager = authenticationProviderManager;
+        this.tenantManager = tenantManager;
     }
 
     @Override
     public Authentication attemptAuthentication(final HttpServletRequest request, final HttpServletResponse response) throws AuthenticationException {
+        String tenantCode = request.getServerName().split("\\.")[0];
+        if (this.tenantManager.exists(tenantCode)) {
+            EntThreadLocal.set(ITenantManager.THREAD_LOCAL_TENANT_CODE, tenantCode);
+        } else {
+            EntThreadLocal.remove(ITenantManager.THREAD_LOCAL_TENANT_CODE);
+        }
         final String authorization = request.getHeader("Authorization");
 
         if (authorization == null || !authorization.matches("^[Bb]earer .*")) {
@@ -168,4 +182,5 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
         response.addHeader("Content-Type", "application/json");
         response.getOutputStream().println(objectMapper.writeValueAsString(restResponse));
     }
+    
 }
