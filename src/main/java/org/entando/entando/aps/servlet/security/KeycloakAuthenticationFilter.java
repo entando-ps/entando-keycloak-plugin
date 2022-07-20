@@ -40,6 +40,8 @@ import java.util.List;
 
 import static java.util.Optional.ofNullable;
 
+import com.agiletec.aps.system.EntThreadLocal;
+import org.entando.entando.aps.system.services.tenant.ITenantManager;
 import org.entando.entando.ent.exception.EntException;
 
 @Service
@@ -53,13 +55,15 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
     private final OpenIDConnectService oidcService;
     private final IAuthenticationProviderManager authenticationProviderManager;
     private final KeycloakAuthorizationManager keycloakGroupManager;
+    private final ITenantManager tenantManager;
 
     @Autowired
     public KeycloakAuthenticationFilter(final KeycloakConfiguration configuration,
                                         final IUserManager userManager,
                                         final OpenIDConnectService oidcService,
                                         final IAuthenticationProviderManager authenticationProviderManager,
-                                        final KeycloakAuthorizationManager keycloakGroupManager) {
+                                        final KeycloakAuthorizationManager keycloakGroupManager,
+                                        final ITenantManager tenantManager) {
         super("/api/**");
         this.objectMapper = new ObjectMapper();
         this.configuration = configuration;
@@ -68,10 +72,17 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
         this.userManager = userManager;
         this.oidcService = oidcService;
         this.authenticationProviderManager = authenticationProviderManager;
+        this.tenantManager = tenantManager;
     }
 
     @Override
     public Authentication attemptAuthentication(final HttpServletRequest request, final HttpServletResponse response) throws AuthenticationException {
+        String tenantCode = request.getServerName().split("\\.")[0];
+        if (this.tenantManager.exists(tenantCode)) {
+            EntThreadLocal.set(ITenantManager.THREAD_LOCAL_TENANT_CODE, tenantCode);
+        } else {
+            EntThreadLocal.remove(ITenantManager.THREAD_LOCAL_TENANT_CODE);
+        }
         final String authorization = request.getHeader("Authorization");
 
         if (authorization == null || !authorization.matches("^[Bb]earer .*")) {
@@ -166,4 +177,5 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
         response.addHeader("Content-Type", "application/json");
         response.getOutputStream().println(objectMapper.writeValueAsString(restResponse));
     }
+    
 }
