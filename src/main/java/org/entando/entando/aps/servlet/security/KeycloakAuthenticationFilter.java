@@ -43,6 +43,7 @@ import java.util.List;
 import static java.util.Optional.ofNullable;
 
 import com.agiletec.aps.system.EntThreadLocal;
+import com.agiletec.aps.util.ApsWebApplicationUtils;
 import org.entando.entando.aps.system.services.tenant.ITenantManager;
 import org.entando.entando.ent.exception.EntException;
 
@@ -57,15 +58,13 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
     private final OpenIDConnectService oidcService;
     private final IAuthenticationProviderManager authenticationProviderManager;
     private final KeycloakAuthorizationManager keycloakGroupManager;
-    private final ITenantManager tenantManager;
 
     @Autowired
     public KeycloakAuthenticationFilter(final KeycloakConfiguration configuration,
                                         final IUserManager userManager,
                                         final OpenIDConnectService oidcService,
                                         final IAuthenticationProviderManager authenticationProviderManager,
-                                        final KeycloakAuthorizationManager keycloakGroupManager,
-                                        final ITenantManager tenantManager) {
+                                        final KeycloakAuthorizationManager keycloakGroupManager) {
         super("/api/**");
         this.objectMapper = new ObjectMapper();
         this.configuration = configuration;
@@ -74,43 +73,36 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
         this.userManager = userManager;
         this.oidcService = oidcService;
         this.authenticationProviderManager = authenticationProviderManager;
-        this.tenantManager = tenantManager;
     }
 
     @Override
     public Authentication attemptAuthentication(final HttpServletRequest request, final HttpServletResponse response) throws AuthenticationException {
-        String tenantCode = request.getServerName().split("\\.")[0];
-        if (this.tenantManager.exists(tenantCode)) {
+        String tenantCode = ApsWebApplicationUtils.extractCurrentTenantCode(request);
+        if (null != tenantCode) {
             EntThreadLocal.set(ITenantManager.THREAD_LOCAL_TENANT_CODE, tenantCode);
         } else {
             EntThreadLocal.remove(ITenantManager.THREAD_LOCAL_TENANT_CODE);
         }
         final String authorization = request.getHeader("Authorization");
-
         if (authorization == null || !authorization.matches("^[Bb]earer .*")) {
             final UserDetails guestUser = userManager.getGuestUser();
             final GuestAuthentication guestAuthentication = new GuestAuthentication(guestUser);
             setUserOnContext(request, guestUser, guestAuthentication);
             return guestAuthentication;
         }
-
         final String bearerToken = authorization.substring("Bearer ".length());
         final ResponseEntity<AccessToken> resp = oidcService.validateToken(bearerToken);
         final AccessToken accessToken = resp.getBody();
-
         if (HttpStatus.NOT_FOUND.equals(resp.getStatusCode()) || HttpStatus.UNAUTHORIZED.equals(resp.getStatusCode())) {
             log.error("Invalid OAuth2 configuration");
             throw new BadCredentialsException("Invalid OAuth configuration");
         }
-
         if (accessToken == null || !accessToken.isActive()) {
             throw new NonceExpiredException("Invalid or expired token");
         }
-
         try {
             final UserDetails user = authenticationProviderManager.getUser(accessToken.getUsername());
             final UserAuthentication userAuthentication = new UserAuthentication(user);
-
             ofNullable(accessToken.getResourceAccess())
                     .map(access -> access.get(configuration.getClientId()))
                     .map(TokenRoles::getRoles)
@@ -120,7 +112,6 @@ public class KeycloakAuthenticationFilter extends AbstractAuthenticationProcessi
 
             // TODO optimise to not check on every request
             keycloakGroupManager.processNewUser(user);
-
             return userAuthentication;
         } catch (EntException e) {
             log.error("System exception", e);

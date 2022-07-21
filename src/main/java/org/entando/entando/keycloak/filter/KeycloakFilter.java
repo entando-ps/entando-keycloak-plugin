@@ -41,6 +41,7 @@ import java.util.UUID;
 import static org.entando.entando.KeycloakWiki.wiki;
 
 import com.agiletec.aps.system.EntThreadLocal;
+import com.agiletec.aps.util.ApsWebApplicationUtils;
 
 import org.entando.entando.aps.system.services.tenant.ITenantManager;
 import org.entando.entando.ent.exception.EntException;
@@ -59,31 +60,25 @@ public class KeycloakFilter implements Filter {
     private final IAuthenticationProviderManager providerManager;
     private final KeycloakAuthorizationManager keycloakGroupManager;
     private final IUserManager userManager;
-    private final ITenantManager tenantManager;
     private final ObjectMapper objectMapper;
 
     public KeycloakFilter(final KeycloakConfiguration configuration,
                           final OpenIDConnectService oidcService,
                           final IAuthenticationProviderManager providerManager,
                           final KeycloakAuthorizationManager keycloakGroupManager,
-                          final IUserManager userManager, 
-                          final ITenantManager tenantManager) {
+                          final IUserManager userManager) {
         this.configuration = configuration;
         this.oidcService = oidcService;
         this.providerManager = providerManager;
         this.keycloakGroupManager = keycloakGroupManager;
         this.userManager = userManager;
         this.objectMapper = new ObjectMapper();
-        this.tenantManager = tenantManager;
     }
 
     @Override
     public void doFilter(final ServletRequest servletRequest,
                          final ServletResponse servletResponse,
                          final FilterChain chain) throws IOException, ServletException {
-        try {
-            
-        
         if (!configuration.isEnabled()) {
             chain.doFilter(servletRequest, servletResponse);
             return;
@@ -91,8 +86,8 @@ public class KeycloakFilter implements Filter {
         EntThreadLocal.init();
         final HttpServletRequest request = (HttpServletRequest) servletRequest;
         
-        String tenantCode = request.getServerName().split("\\.")[0];
-        if (this.tenantManager.exists(tenantCode)) {
+        String tenantCode = ApsWebApplicationUtils.extractCurrentTenantCode(request);
+        if (null != tenantCode) {
             EntThreadLocal.set(ITenantManager.THREAD_LOCAL_TENANT_CODE, tenantCode);
         }
         
@@ -125,11 +120,6 @@ public class KeycloakFilter implements Filter {
                 chain.doFilter(request, response);
         }
         EntThreadLocal.destroy();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        } finally {
-        }
     }
     
 	protected String getFullResourcePath(HttpServletRequest request) {
