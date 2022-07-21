@@ -25,13 +25,23 @@ import java.util.*;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import javax.servlet.ServletContext;
+import org.entando.entando.aps.system.services.tenant.ITenantManager;
+import org.entando.entando.keycloak.filter.KeycloakFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 @ExtendWith(MockitoExtension.class)
 class KeycloakAuthenticationFilterTest {
@@ -40,6 +50,8 @@ class KeycloakAuthenticationFilterTest {
     private KeycloakConfiguration configuration;
     @Mock
     private IUserManager userManager;
+    @Mock
+    private ITenantManager tenantManager;
     @Mock
     private OpenIDConnectService oidcService;
     @Mock
@@ -55,65 +67,73 @@ class KeycloakAuthenticationFilterTest {
     @Mock
     private HttpSession session;
     @Mock
+    private ServletContext svCtx;
+    @Mock
+    private WebApplicationContext wac;
+    @Mock
     private Map<String, TokenRoles> resourceAccess;
     @Mock
     private TokenRoles tokenRoles;
 
     @InjectMocks
     private KeycloakAuthenticationFilter keycloakAuthenticationFilter;
+    
+    @BeforeEach
+    public void setUp() {
+        Mockito.lenient().when(request.getSession()).thenReturn(session);
+        Mockito.lenient().when(request.getServerName()).thenReturn("dev.entando.org");
+        Mockito.lenient().when(session.getServletContext()).thenReturn(svCtx);
+        Mockito.lenient().when(wac.getBean(ITenantManager.class)).thenReturn(tenantManager);
+    }
 
     @Test
     public void attemptAuthenticationWithSuperuserPermissionShouldAddKeycloakAuthentication() throws Exception {
-
         List<String> expected = Collections.singletonList(Permission.SUPERUSER);
-
         // multiple permissions
         this.mockForAttemptAuthenticationTest();
         List<String> permissionList = Arrays.asList(Permission.ENTER_BACKEND, Permission.SUPERUSER);
         when(tokenRoles.getRoles()).thenReturn(permissionList);
-        User actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
-        KeycloakAuthenticationFilterAssertionHelper.assertKeycloakAuthorization(actual.getAuthorizations().get(0), expected);
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            User actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
+            KeycloakAuthenticationFilterAssertionHelper.assertKeycloakAuthorization(actual.getAuthorizations().get(0), expected);
 
-        // single permission
-        this.mockForAttemptAuthenticationTest();
-        permissionList = Collections.singletonList(Permission.SUPERUSER);
-        when(tokenRoles.getRoles()).thenReturn(permissionList);
-        actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
-        KeycloakAuthenticationFilterAssertionHelper.assertKeycloakAuthorization(actual.getAuthorizations().get(0), expected);
+            // single permission
+            this.mockForAttemptAuthenticationTest();
+            permissionList = Collections.singletonList(Permission.SUPERUSER);
+            when(tokenRoles.getRoles()).thenReturn(permissionList);
+            actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
+            KeycloakAuthenticationFilterAssertionHelper.assertKeycloakAuthorization(actual.getAuthorizations().get(0), expected);
+        }
     }
-
 
     @Test
     public void attemptAuthenticationWithoutKeycloakPermissionShouldReturnEmptyAuthorizationList() throws Exception {
-
         this.mockForAttemptAuthenticationTest();
-
         List<String> permissionList = Collections.singletonList(Permission.ENTER_BACKEND);
         when(tokenRoles.getRoles()).thenReturn(permissionList);
-        User actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
-
-        assertEquals(0, actual.getAuthorizations().size());
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            User actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
+            assertEquals(0, actual.getAuthorizations().size());
+        }
     }
-
 
     @Test
     public void attemptAuthenticationWithEmptyOrNullPermissionListShouldReturnEmptyAuthorizationList() throws Exception {
-
         this.mockForAttemptAuthenticationTest();
-
         when(tokenRoles.getRoles()).thenReturn(null);
-        User actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
-        assertEquals(0, actual.getAuthorizations().size());
-
-        when(tokenRoles.getRoles()).thenReturn(new ArrayList<>());
-        actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
-        assertEquals(0, actual.getAuthorizations().size());
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            User actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
+            assertEquals(0, actual.getAuthorizations().size());
+            when(tokenRoles.getRoles()).thenReturn(new ArrayList<>());
+            actual = (User) keycloakAuthenticationFilter.attemptAuthentication(request, response).getPrincipal();
+            assertEquals(0, actual.getAuthorizations().size());
+        }
     }
-
-
-
+    
     private void mockForAttemptAuthenticationTest() throws Exception {
-
         when(request.getHeader("Authorization")).thenReturn("Bearer jwt");
         when(request.getSession()).thenReturn(session);
         doNothing().when(session).setAttribute(anyString(), any());
@@ -125,4 +145,5 @@ class KeycloakAuthenticationFilterTest {
         when(configuration.getClientId()).thenReturn("clientId");
         when(resourceAccess.get(anyString())).thenReturn(tokenRoles);
     }
+    
 }
