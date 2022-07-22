@@ -53,7 +53,6 @@
         <constructor-arg index="2" ref="AuthenticationProviderManager" />
         <constructor-arg index="3" ref="keycloakAuthorizationManager" />
         <constructor-arg index="4" ref="UserManager" />
-        <constructor-arg index="5" ref="TenantManager" />
     </bean>
 
     <bean id="keycloakOauth2Interceptor" class="org.entando.entando.keycloak.interceptor.KeycloakOauth2Interceptor"/>
