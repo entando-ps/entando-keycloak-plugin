@@ -1,16 +1,6 @@
 package org.entando.entando.keycloak.filter;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.agiletec.aps.system.SystemConstants;
 import com.agiletec.aps.system.services.user.IAuthenticationProviderManager;
@@ -18,8 +8,6 @@ import com.agiletec.aps.system.services.user.IUserManager;
 import com.agiletec.aps.system.services.user.User;
 import com.agiletec.aps.system.services.user.UserDetails;
 import com.jayway.jsonpath.JsonPath;
-import java.io.IOException;
-import java.io.StringWriter;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
@@ -59,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
@@ -71,28 +58,46 @@ import org.springframework.web.context.support.WebApplicationContextUtils;
 @ExtendWith(MockitoExtension.class)
 class KeycloakFilterTest {
 
-    @Mock private KeycloakConfiguration configuration;
-    @Mock private OpenIDConnectService oidcService;
-    @Mock private IAuthenticationProviderManager providerManager;
-    @Mock private KeycloakAuthorizationManager keycloakGroupManager;
-    @Mock private IUserManager userManager;
-    @Mock private ITenantManager tenantManager;
+    @Mock
+    private KeycloakConfiguration configuration;
+    @Mock
+    private OpenIDConnectService oidcService;
+    @Mock
+    private IAuthenticationProviderManager providerManager;
+    @Mock
+    private KeycloakAuthorizationManager keycloakGroupManager;
+    @Mock
+    private IUserManager userManager;
+    @Mock
+    private ITenantManager tenantManager;
+    @Mock
+    private HttpServletRequest request;
+    @Mock
+    private HttpServletResponse response;
+    @Mock
+    private HttpSession session;
+    @Mock
+    private ServletContext svCtx;
+    @Mock
+    private WebApplicationContext wac;
+    @Mock
+    private FilterChain filterChain;
 
-    @Mock private HttpServletRequest request;
-    @Mock private HttpServletResponse response;
-    @Mock private HttpSession session;
-    @Mock private ServletContext svCtx;
-    @Mock private WebApplicationContext wac;
-    @Mock private FilterChain filterChain;
+    @Mock
+    private ResponseEntity<AccessToken> accessTokenResponse;
+    @Mock
+    private ResponseEntity<AuthResponse> authResponse;
+    @Mock
+    private ResponseEntity<AuthResponse> refreshResponse;
+    @Mock
+    private UserDetails userDetails;
 
-    @Mock private ResponseEntity<AccessToken> accessTokenResponse;
-    @Mock private ResponseEntity<AuthResponse> authResponse;
-    @Mock private ResponseEntity<AuthResponse> refreshResponse;
-    @Mock private UserDetails userDetails;
-
-    @Mock private AccessToken accessToken;
-    @Mock private AuthResponse auth;
-    @Mock private AuthResponse refreshAuth;
+    @Mock
+    private AccessToken accessToken;
+    @Mock
+    private AuthResponse auth;
+    @Mock
+    private AuthResponse refreshAuth;
 
     private KeycloakFilter keycloakFilter;
 
@@ -382,7 +387,7 @@ class KeycloakFilterTest {
         when(oidcService.refreshToken(anyString())).thenThrow(exception);
 
         when(userManager.getGuestUser()).thenReturn(userDetails);
-        try (MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
             wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
             keycloakFilter.doFilter(request, response, filterChain);
         }
@@ -397,11 +402,12 @@ class KeycloakFilterTest {
     void apiCallShouldNotSaveUserOnSession() throws Exception {
         when(configuration.isEnabled()).thenReturn(true);
         when(request.getServletPath()).thenReturn("/api");
-
-        keycloakFilter.doFilter(request, response, filterChain);
-
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakFilter.doFilter(request, response, filterChain);
+        }
         verify(filterChain, times(1)).doFilter(any(), any());
-        verify(request, never()).getSession();
+        verify(request, times(1)).getSession();
     }
 
     @Test
@@ -426,7 +432,10 @@ class KeycloakFilterTest {
         when(oidcService.validateToken("<token>")).thenReturn(ResponseEntity.ok().body(token));
         when(providerManager.getUser("<username>")).thenReturn(userDetails);
 
-        keycloakFilter.doFilter(request, response, filterChain);
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakFilter.doFilter(request, response, filterChain);
+        }
 
         verify(session, times(1)).setAttribute(eq("user"), same(userDetails));
     }
@@ -442,7 +451,7 @@ class KeycloakFilterTest {
 
         final StringWriter writer = new StringWriter();
         when(response.getOutputStream()).thenReturn(new ServletOutputStreamWrapper(writer));
-        try (MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
             wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
             keycloakFilter.doFilter(request, response, filterChain);
         }
@@ -460,13 +469,14 @@ class KeycloakFilterTest {
 
     @Test
     void testRedirectParameterIsSetForNullUser() throws Exception {
-
         String path = "/do/jacms/Content/list.action";
 
         when(configuration.isEnabled()).thenReturn(true);
         when(request.getServletPath()).thenReturn(path);
-        keycloakFilter.doFilter(request, response, filterChain);
-
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakFilter.doFilter(request, response, filterChain);
+        }
         verify(session).setAttribute(KeycloakFilter.SESSION_PARAM_REDIRECT, "/do/jacms/Content/list.action");
     }
 
@@ -480,8 +490,10 @@ class KeycloakFilterTest {
         Mockito.lenient().when(session.getAttribute(eq("user"))).thenReturn(user);
         when(configuration.isEnabled()).thenReturn(true);
         when(request.getServletPath()).thenReturn(path);
-        keycloakFilter.doFilter(request, response, filterChain);
-
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakFilter.doFilter(request, response, filterChain);
+        }
         verify(session).setAttribute(KeycloakFilter.SESSION_PARAM_REDIRECT, "/do/jacms/Content/list.action");
     }
 
@@ -494,8 +506,10 @@ class KeycloakFilterTest {
         when(configuration.isEnabled()).thenReturn(true);
         when(request.getServletPath()).thenReturn(path);
         when(request.getQueryString()).thenReturn(queryString);
-        keycloakFilter.doFilter(request, response, filterChain);
-
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakFilter.doFilter(request, response, filterChain);
+        }
         verify(session).setAttribute(KeycloakFilter.SESSION_PARAM_REDIRECT, "/do/jacms/Resource/list.action?resourceTypeCode=Image");
     }
 
@@ -510,13 +524,17 @@ class KeycloakFilterTest {
         when(request.getServletPath()).thenReturn(path);
         when(request.getParameter("returnUrl")).thenReturn(returnUrlParam);
         when(request.getContextPath()).thenReturn(contextPath);
-        keycloakFilter.doFilter(request, response, filterChain);
-
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakFilter.doFilter(request, response, filterChain);
+        }
         verify(response).sendRedirect("https://dev.entando.org/entando-app/do/login?redirectTo=" + returnUrlParam);
     }
 
     static class ServletOutputStreamWrapper extends ServletOutputStream {
+
         private final StringWriter writer;
+
         private ServletOutputStreamWrapper(final StringWriter aWriter) {
             this.writer = aWriter;
         }
@@ -532,7 +550,8 @@ class KeycloakFilterTest {
         }
 
         @Override
-        public void setWriteListener(final WriteListener writeListener) {}
+        public void setWriteListener(final WriteListener writeListener) {
+        }
     }
 
     private AbstractCharSequenceAssert assertJsonString(final String json, final String path) {

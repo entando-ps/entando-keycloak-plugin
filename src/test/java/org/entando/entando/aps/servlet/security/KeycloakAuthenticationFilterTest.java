@@ -1,45 +1,29 @@
 package org.entando.entando.aps.servlet.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.agiletec.aps.system.services.role.Permission;
 import com.agiletec.aps.system.services.user.IAuthenticationProviderManager;
-import com.agiletec.aps.system.services.user.IUserManager;
 import com.agiletec.aps.system.services.user.User;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import org.entando.entando.assertionHelper.KeycloakAuthenticationFilterAssertionHelper;
-import org.entando.entando.keycloak.services.KeycloakAuthorizationManager;
 import org.entando.entando.keycloak.services.KeycloakConfiguration;
 import org.entando.entando.keycloak.services.oidc.OpenIDConnectService;
 import org.entando.entando.keycloak.services.oidc.model.AccessToken;
 import org.entando.entando.keycloak.services.oidc.model.TokenRoles;
 import org.entando.entando.mockhelper.UserMockHelper;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.util.*;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -49,9 +33,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.agiletec.aps.system.services.user.IUserManager;
 import javax.servlet.ServletContext;
 import org.entando.entando.aps.system.services.tenant.ITenantManager;
-import org.entando.entando.keycloak.filter.KeycloakFilter;
+import org.entando.entando.keycloak.services.KeycloakAuthorizationManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -154,9 +139,12 @@ class KeycloakAuthenticationFilterTest {
     @Test
     void apiAuthenticationShouldSetAttributeRequest() throws Exception {
         when(request.getServletPath()).thenReturn("/api");
-        keycloakAuthenticationFilter.attemptAuthentication(request, response);
-        verify(request).setAttribute(eq("user"), any());
-        verify(request, never()).getSession();
+        try ( MockedStatic<WebApplicationContextUtils> wacUtil = Mockito.mockStatic(WebApplicationContextUtils.class)) {
+            wacUtil.when(() -> WebApplicationContextUtils.getWebApplicationContext(svCtx)).thenReturn(wac);
+            keycloakAuthenticationFilter.attemptAuthentication(request, response);
+            verify(request).setAttribute(eq("user"), any());
+            verify(request, times(1)).getSession();
+        }
     }
 
     private void mockForAttemptAuthenticationTest() throws Exception {
