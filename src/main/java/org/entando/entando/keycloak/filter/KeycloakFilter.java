@@ -39,6 +39,7 @@ import static org.entando.entando.KeycloakWiki.wiki;
 
 import com.agiletec.aps.system.EntThreadLocal;
 import com.agiletec.aps.util.ApsWebApplicationUtils;
+import java.util.function.Function;
 
 import org.entando.entando.aps.system.services.tenant.ITenantManager;
 import org.entando.entando.ent.exception.EntException;
@@ -237,8 +238,9 @@ public class KeycloakFilter implements Filter {
             return;
         } else {
             final String path = request.getRequestURL().toString().replace(request.getServletPath(), "");
-            if (redirectTo != null){
-                final String redirect = redirectTo.replace(path, "");
+            if (redirectTo != null) {
+                Function<String, String> cleaner = x -> x.replace("https://", "http://");
+                final String redirect = cleaner.apply(redirectTo).replace(cleaner.apply(path), "");
                 if (!redirect.startsWith("/")) {
                     throw new EntandoTokenException("Invalid redirect", request, "guest");
                 }
@@ -258,6 +260,8 @@ public class KeycloakFilter implements Filter {
             response.sendRedirect(redirect);
         }
     }
+    
+    
 
     private void saveUserOnSession(final HttpServletRequest request, final UserDetails user) {
         request.getSession().setAttribute("user", user);
